@@ -66,3 +66,13 @@ button.primary{background:var(--ex-accent);border-color:var(--ex-accent);color:v
 .clean-sjt .criterion-rating-scale{list-style:none;padding:0;margin:14px 0 0}
 .clean-sjt .criterion-rating-scale .intro-score-row{display:grid;grid-template-columns:36px minmax(0,1fr);gap:14px;padding:12px 0;margin:0;border-bottom:1px solid #e5ebe7;align-items:center}
 .clean-sjt .criterion-rating-scale .intro-score-row:last-child{border-bottom:0}
+
+/* Keep backward and forward navigation in stable left/right positions on phones. */
+@media(max-width:600px){
+  .clean-sjt .sd-body__navigation{display:flex;flex-direction:row;flex-wrap:nowrap;gap:12px;padding:16px 0}
+  .clean-sjt .sd-body__navigation .sv-action:not(.sv-action--hidden){flex:1 1 0;min-width:0;margin:0}
+  .clean-sjt .sd-body__navigation .sv-action__content{display:flex;min-width:0}
+  .clean-sjt .sd-body__navigation .sd-btn{width:100%;min-width:0;min-height:52px;margin:0;padding:14px 8px;font-size:14px;line-height:1.5;white-space:normal;box-sizing:border-box}
+  .clean-sjt .sd-body__navigation .sd-navigation__prev-btn{background:#fff;color:var(--ex-accent);border:1px solid var(--ex-border);box-shadow:none}
+  .clean-sjt .sd-body__navigation .sd-navigation__next-btn,.clean-sjt .sd-body__navigation .sd-navigation__complete-btn{background:var(--ex-accent);color:var(--ex-on-accent);border:1px solid var(--ex-accent)}
+}
