@@ -63,3 +63,6 @@ button.primary{background:var(--ex-accent);border-color:var(--ex-accent);color:v
 .clean-sjt #intro>.note{margin:26px 0 0}
 .clean-sjt #start{margin-top:18px}
 @media(max-width:480px){.clean-sjt #intro{padding:22px 18px}.clean-sjt .intro-section{margin-top:26px;padding-top:22px}.clean-sjt .intro-section>h3:first-child{font-size:17px}}
+.clean-sjt .criterion-rating-scale{list-style:none;padding:0;margin:14px 0 0}
+.clean-sjt .criterion-rating-scale .intro-score-row{display:grid;grid-template-columns:36px minmax(0,1fr);gap:14px;padding:12px 0;margin:0;border-bottom:1px solid #e5ebe7;align-items:center}
+.clean-sjt .criterion-rating-scale .intro-score-row:last-child{border-bottom:0}

@@ -5,6 +5,7 @@
   if (!window.Survey?.Model) { el('status').textContent = 'Library form belum dapat dimuat. Pastikan folder vendor berada bersama file form.'; el('start').disabled = true; return; }
   const isSjt = config.slug === 'sjt-soc';
   const original = config.sourceForm;
+  const cleanForm = Boolean(original);
   const criteria = {
     relevance: { title: 'Relevansi dengan dimensi', labels: ['Tidak relevan', 'Kurang relevan', 'Relevan', 'Sangat relevan'] },
     clarity: { title: 'Kejelasan bahasa', labels: ['Tidak jelas', 'Kurang jelas', 'Jelas', 'Sangat jelas'] },
@@ -12,12 +13,8 @@
     balance: { title: 'Keseimbangan daya tarik empat opsi', labels: ['Tidak seimbang', 'Kurang seimbang', 'Seimbang', 'Sangat seimbang'] },
     scoring: { title: 'Ketepatan urutan skor opsi', labels: ['Tidak tepat', 'Kurang tepat', 'Tepat', 'Sangat tepat'] }
   };
-  if (isSjt && original) {
-    ['realism', 'balance', 'scoring'].forEach((key, i) => {
-      criteria[key] = { title: original.criteria[i], labels: original.scaleLabels };
-    });
-  }
-  const criterionKeys = isSjt && original ? ['realism', 'balance', 'scoring'] : ['relevance', 'clarity', ...(isSjt ? ['realism', 'balance', 'scoring'] : [])];
+  const criterionKeys = config.criterionKeys || (isSjt ? ['realism','balance','scoring'] : ['relevance','clarity']);
+  if (original) criterionKeys.forEach((key,i) => { criteria[key] = {title:original.criteria[i],labels:original.scales?.[i] || original.scaleLabels}; });
   if (el('purpose')) el('purpose').textContent = isSjt
     ? 'Menilai situasi dan dilema prajurit, keseimbangan serta kewajaran empat opsi jawaban, dan ketepatan skor opsi sesuai tiga kriteria pada formulir asli.'
     : 'Menilai relevansi setiap butir dengan definisi dimensinya serta kejelasan bahasa bagi calon responden. Bapak/Ibu menilai mutu butir sebagai ahli, bukan menjawab kuesioner sebagai prajurit.';
@@ -40,10 +37,11 @@
   } else for (const key of criterionKeys) {
     const section = document.createElement('section'), title = document.createElement('strong'), p = document.createElement('p');
     title.textContent = criteria[key].title;
-    p.textContent = criteria[key].labels.map((label, i) => `${i + 1} = ${label}`).join(' · ');
-    section.append(title, p); el('scales').append(section);
+    const list = document.createElement('ol'); list.className = 'criterion-rating-scale';
+    criteria[key].labels.forEach((label,i) => { const row=document.createElement('li'); row.className='intro-score-row'; const number=document.createElement('strong'), text=document.createElement('span'); number.textContent=String(i+1); text.textContent=label; row.append(number,text); list.append(row); });
+    section.append(title, list); el('scales').append(section);
   }
-  const storageKey = 'expert-review-' + config.slug + (isSjt && original ? '-original-v2' : '-v1') + (config.simulation ? '-simulation' : '') + (config.previewPage ? '-preview-' + config.previewPage : '');
+  const storageKey = 'expert-review-' + config.slug + (original ? (isSjt ? '-original-v2' : '-original-v3') : '-v1') + (config.simulation ? '-simulation' : '') + (config.previewPage ? '-preview-' + config.previewPage : '');
   const escape = text => text.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const nameFor = item => 'item_' + item.id.replace('.', '_');
   const required = { isRequired: true, requiredErrorText: 'Lengkapi bagian ini untuk melanjutkan.' };
@@ -59,7 +57,7 @@
       '<section class="sjt-options"><h3>Opsi jawaban dan skor</h3><ol aria-label="Opsi jawaban skenario">' + options + '</ol></section></div>';
   }
   function makeSurvey() {
-    const identity = isSjt && original ? [
+    const identity = original ? [
       { type: 'text', name: 'expert_name', title: original.identityLabels[0], maxLength: 150, ...required },
       { type: 'text', name: 'position_unit', title: original.identityLabels[1], maxLength: 250, ...required },
       { type: 'text', name: 'years_service', title: original.identityLabels[2] + ' (Tahun)', inputType: 'number', min: 0, ...required },
@@ -78,15 +76,15 @@
     for (const [index, item] of config.items.entries()) {
       const id = nameFor(item);
       const stem = config.slug === 'kesiapan-penugasan' ? '<p>Seberapa yakin Anda bahwa Batalyon Anda secara kolektif mampu:</p>' : '';
-      const source = isSjt ? scenarioMarkup(item) : stem + '<p><strong>' + escape(item.text) + '</strong></p>';
-      pages.push({ name: id, title: isSjt ? 'SOAL ' + item.id : 'Butir ' + item.id + ` · ${index + 1} dari ${config.items.length}`, description: isSjt ? '' : item.name + '\n' + item.definition, elements: [
+      const source = isSjt ? scenarioMarkup(item) : '<div class="sjt-stimulus"><section class="sjt-dimension"><p class="sjt-label">Dimensi yang dinilai</p><h3>'+escape(item.name)+'</h3><p class="sjt-definition">'+escape(item.definition)+'</p></section><section class="sjt-situation"><h3>Pernyataan</h3>'+stem+'<p>'+escape(item.text)+'</p>'+(item.perspective ? '<p class="note">Sudut pandang: '+escape(item.perspective)+'</p>' : '')+(config.slug==='kesiapan-penugasan' ? '<p class="note">Skala jawaban prajurit: 0–100%.</p>' : '')+'</section></div>';
+      pages.push({ name: id, title: (isSjt ? 'SOAL ' : 'BUTIR ') + item.id, description: '', elements: [
         { type: 'html', name: id + '_source', html: source },
         ...criterionKeys.map((key, i) => ({
           type: 'radiogroup', name: id + '_' + key, title: criteria[key].title, ...required, colCount: 1,
           choices: criteria[key].labels.map((text, j) => ({ value: j + 1, text: `${j + 1} — ${text}` })),
-          showCommentArea: !isSjt && i === criterionKeys.length - 1, commentText: original?.commentLabel || 'Komentar atau usulan perbaikan untuk butir ini (opsional)', commentPlaceholder: 'Alasan penilaian atau usulan redaksi…'
+          showCommentArea: !cleanForm && i === criterionKeys.length - 1, commentText: original?.commentLabel || 'Komentar atau usulan perbaikan untuk butir ini (opsional)', commentPlaceholder: 'Alasan penilaian atau usulan redaksi…'
         })),
-        ...(isSjt ? [{ type: 'comment', name: id + '_feedback', title: original?.commentLabel || 'Masukan dari Panelis Ahli (jika ada)', placeholder: 'Saran skenario, opsi, atau urutan skor…', autoGrow: true, maxLength: 10000 }] : [])
+        ...(cleanForm ? [{ type: 'comment', name: id + '_feedback', title: original?.commentLabel || 'Masukan dari Panelis Ahli (jika ada)', placeholder: isSjt ? 'Saran skenario, opsi, atau urutan skor…' : 'Catatan atau usulan perbaikan untuk butir ini…', autoGrow: true, maxLength: 10000 }] : [])
       ] });
     }
     pages.push({ name: 'recommendation', title: original ? 'Kesimpulan dan Rekomendasi' : 'Kesimpulan dan rekomendasi', elements: [
@@ -97,7 +95,7 @@
       ] },
       { type: 'comment', name: 'general_notes', title: 'Catatan umum dan rekomendasi perbaikan (opsional)', autoGrow: true }
     ] });
-    return { pages, title: '', showTitle: !isSjt, textUpdateMode: 'onTyping', showQuestionNumbers: 'off', showProgressBar: 'top', progressBarType: 'pages', showPreviewBeforeComplete: isSjt ? 'noPreview' : 'showAnsweredQuestions', previewText: 'Tinjau seluruh penilaian', editText: 'Kembali mengisi', completeText: isSjt ? 'Kirim penilaian' : 'Selesaikan penilaian', pageNextText: 'Berikutnya', pagePrevText: 'Sebelumnya', widthMode: 'responsive', autoGrowComment: true, focusFirstQuestionAutomatic: false, requiredText: '*' };
+    return { pages, title: '', showTitle: !cleanForm, textUpdateMode: 'onTyping', showQuestionNumbers: 'off', showProgressBar: 'top', progressBarType: 'pages', showPreviewBeforeComplete: cleanForm ? 'noPreview' : 'showAnsweredQuestions', previewText: 'Tinjau seluruh penilaian', editText: 'Kembali mengisi', completeText: cleanForm ? 'Kirim penilaian' : 'Selesaikan penilaian', pageNextText: 'Berikutnya', pagePrevText: 'Sebelumnya', widthMode: 'responsive', autoGrowComment: true, focusFirstQuestionAutomatic: false, requiredText: '*' };
   }
   const survey = new Survey.Model(makeSurvey());
   let savingAvailable = true, saved;
@@ -113,7 +111,7 @@
     survey.data = answers; survey.currentPageNo = Math.max(0, Math.min(saved.page || 0, survey.pages.length - 1)); el('start').textContent = 'Lanjutkan penilaian';
   }
   if (isSjt) { survey.setValue('signature', undefined); survey.setValue('signer_name', undefined); }
-  const online = isSjt && !config.simulation && !config.previewPage;
+  const online = cleanForm && !config.simulation && !config.previewPage;
   let receipt = null, sending = false, confirmed = false;
   function submissionAnswers() {
     const answers = {};
@@ -145,14 +143,14 @@
   function persist() {
     const record = { instrument: config.slug, answers: survey.data, page: survey.currentPageNo, updatedAt: new Date().toISOString() };
     try { localStorage.setItem(storageKey, JSON.stringify(record)); savingAvailable = true; } catch (_) { savingAvailable = false; }
-    el('status').textContent = savingAvailable ? (isSjt ? '' : 'Draf tersimpan di browser perangkat ini. Belum dikirim kepada peneliti.') : (isSjt ? 'Penyimpanan otomatis tidak tersedia. Selesaikan pengisian dan kirim penilaian sebelum menutup halaman ini.' : 'Penyimpanan otomatis tidak tersedia. Unduh draf untuk menyimpan salinan jawaban.');
+    el('status').textContent = savingAvailable ? (cleanForm ? '' : 'Draf tersimpan di browser perangkat ini. Belum dikirim kepada peneliti.') : (cleanForm ? 'Penyimpanan otomatis tidak tersedia. Selesaikan pengisian dan kirim penilaian sebelum menutup halaman ini.' : 'Penyimpanan otomatis tidak tersedia. Unduh draf untuk menyimpan salinan jawaban.');
   }
   survey.onValueChanged.add(persist); survey.onCurrentPageChanged.add(persist);
   function showForm() {
     if (survey.isCompleted) survey.clear(false, true);
     el('intro').hidden = true; el('result').hidden = true; el('survey').hidden = false; el('tools').hidden = false;
     el('survey').replaceChildren(); const mount = document.createElement('div'); el('survey').append(mount); survey.render(mount);
-    el('status').textContent = savingAvailable ? (isSjt ? '' : 'Nilai bertanda * wajib diisi. Komentar bersifat opsional.') : (isSjt ? 'Penyimpanan otomatis tidak tersedia. Selesaikan pengisian dan kirim penilaian sebelum menutup halaman ini.' : 'Penyimpanan otomatis tidak tersedia. Unduh draf sebelum menutup form.');
+    el('status').textContent = savingAvailable ? (cleanForm ? '' : 'Nilai bertanda * wajib diisi. Komentar bersifat opsional.') : (cleanForm ? 'Penyimpanan otomatis tidak tersedia. Selesaikan pengisian dan kirim penilaian sebelum menutup halaman ini.' : 'Penyimpanan otomatis tidak tersedia. Unduh draf sebelum menutup form.');
   }
   function showIntro() {
     persist(); el('intro').hidden = false; el('survey').hidden = true; el('result').hidden = true; el('tools').hidden = true; el('start').textContent = 'Lanjutkan penilaian';
@@ -165,7 +163,7 @@
   }
   survey.onComplete.add(() => {
     persist(); el('survey').hidden = true; el('intro').hidden = true; el('result').hidden = false; el('tools').hidden = true;
-    if (isSjt) {
+    if (cleanForm) {
       el('result-title').textContent = config.simulation ? 'Simulasi selesai' : 'Terima kasih';
       el('result-message').textContent = receipt
         ? 'Penilaian Bapak/Ibu telah kami terima. Terima kasih atas waktu dan masukan yang diberikan.'
@@ -190,13 +188,13 @@
     const rows = [['instrument', ...identityKeys, 'item', 'dimension', 'source_text', 'options', ...criterionKeys, 'comment', 'recommendation', 'general_notes']];
     for (const item of config.items) {
       const prefix = nameFor(item);
-      rows.push([config.slug, ...identityKeys.map(k => survey.getValue(k) ?? ''), item.id, item.name, item.text, (item.options || []).join('\n'), ...criterionKeys.map(k => survey.getValue(prefix + '_' + k) ?? ''), (isSjt ? survey.getValue(prefix + '_feedback') : survey.getComment(prefix + '_' + criterionKeys.at(-1))) || '', survey.getValue('recommendation') || '', survey.getValue('general_notes') || '']);
+      rows.push([config.slug, ...identityKeys.map(k => survey.getValue(k) ?? ''), item.id, item.name, item.text, (item.options || []).join('\n'), ...criterionKeys.map(k => survey.getValue(prefix + '_' + k) ?? ''), (cleanForm ? survey.getValue(prefix + '_feedback') : survey.getComment(prefix + '_' + criterionKeys.at(-1))) || '', survey.getValue('recommendation') || '', survey.getValue('general_notes') || '']);
     }
     const cell = value => { let s = Array.isArray(value) ? value.join('; ') : String(value); if (/^[=+@\-\t\r]/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"'; };
     download('\uFEFF' + rows.map(row => row.map(cell).join(',')).join('\r\n'), 'csv', 'text/csv;charset=utf-8');
   }
   el('start').addEventListener('click', showForm); el('guide').addEventListener('click', showIntro);
-  if (!isSjt || config.simulation) {
+  if (!cleanForm || config.simulation) {
     el('draft')?.addEventListener('click', () => { persist(); json(true); }); el('json')?.addEventListener('click', () => json()); el('csv')?.addEventListener('click', csv);
     el('edit')?.addEventListener('click', () => { const data = { ...survey.data }; survey.clear(false, true); survey.data = data; survey.currentPageNo = survey.pages.length - 1; showForm(); });
   }

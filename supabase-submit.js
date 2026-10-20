@@ -4,9 +4,10 @@
     const request = deps.fetch || root.fetch.bind(root);
     const storage = deps.storage || (() => { try { return root.localStorage; } catch (_) { return null; } })();
     const uuid = deps.uuid || (() => root.crypto.randomUUID());
-    const endpoint = new URL('/rest/v1/rpc/submit_sjt_review', config.url);
+    const isScale = ['soc-likert','kesiapan-penugasan'].includes(config.instrument);
+    const endpoint = new URL('/rest/v1/rpc/' + (isScale ? 'submit_scale_review' : 'submit_sjt_review'), config.url);
     if (endpoint.protocol !== 'https:' || !config.publishableKey?.startsWith('sb_publishable_')) throw new Error('Konfigurasi pengiriman tidak valid.');
-    const storageKey = 'sjt-supabase-pending-v1@' + endpoint.host;
+    const storageKey = (isScale ? config.instrument + '-supabase-pending-v1@' : 'sjt-supabase-pending-v1@') + endpoint.host;
     let pending;
     try { pending = JSON.parse(storage?.getItem(storageKey) || 'null'); } catch (_) {}
     let inflight = false;
@@ -24,7 +25,7 @@
         try {
           const response = await request(endpoint.href, {
             method: 'POST', headers: { apikey: config.publishableKey, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ p_submission_id: pending.id, p_answers: answers }), signal: controller.signal
+            body: JSON.stringify({ p_submission_id: pending.id, p_answers: answers, ...(isScale ? {p_instrument:config.instrument} : {}) }), signal: controller.signal
           });
           if (!response.ok) throw new Error(response.status === 400 ? 'Data belum dapat diterima. Periksa kelengkapan jawaban lalu coba lagi.' : 'Pengiriman belum berhasil. Jawaban tetap tersimpan; silakan coba lagi.');
           const receipt = await response.json();
@@ -38,5 +39,5 @@
     };
   }
   if (typeof module !== 'undefined' && module.exports) module.exports = { createSubmissionClient };
-  else if (root.SJT_BACKEND) root.SjtSubmission = createSubmissionClient(root.SJT_BACKEND);
+  else if (root.SJT_BACKEND) root.SjtSubmission = createSubmissionClient({...root.SJT_BACKEND,instrument:JSON.parse(root.document.getElementById('form-config').textContent).slug});
 })(typeof window === 'undefined' ? globalThis : window);
