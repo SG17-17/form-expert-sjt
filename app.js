@@ -84,8 +84,9 @@
         ...criterionKeys.map((key, i) => ({
           type: 'radiogroup', name: id + '_' + key, title: criteria[key].title, ...required, colCount: 1,
           choices: criteria[key].labels.map((text, j) => ({ value: j + 1, text: `${j + 1} — ${text}` })),
-          showCommentArea: i === criterionKeys.length - 1, commentText: original?.commentLabel || 'Komentar atau usulan perbaikan untuk butir ini (opsional)', commentPlaceholder: isSjt ? 'Saran skenario, opsi, atau urutan skor…' : 'Alasan penilaian atau usulan redaksi…'
-        }))
+          showCommentArea: !isSjt && i === criterionKeys.length - 1, commentText: original?.commentLabel || 'Komentar atau usulan perbaikan untuk butir ini (opsional)', commentPlaceholder: 'Alasan penilaian atau usulan redaksi…'
+        })),
+        ...(isSjt ? [{ type: 'comment', name: id + '_feedback', title: original?.commentLabel || 'Masukan dari Panelis Ahli (jika ada)', placeholder: 'Saran skenario, opsi, atau urutan skor…', autoGrow: true, maxLength: 10000 }] : [])
       ] });
     }
     pages.push({ name: 'recommendation', title: original ? 'Kesimpulan dan Rekomendasi' : 'Kesimpulan dan rekomendasi', elements: [
@@ -102,16 +103,28 @@
   let savingAvailable = true, saved;
   try { saved = JSON.parse(localStorage.getItem(storageKey) || 'null'); } catch (_) { savingAvailable = false; }
   if (!saved && config.simulation && config.simulationAnswers) saved = { answers: config.simulationAnswers, page: 1 };
-  if (saved?.answers && typeof saved.answers === 'object') { survey.data = saved.answers; survey.currentPageNo = Math.max(0, Math.min(saved.page || 0, survey.pages.length - 1)); el('start').textContent = 'Lanjutkan penilaian'; }
+  if (saved?.answers && typeof saved.answers === 'object') {
+    const answers = { ...saved.answers };
+    if (isSjt) for (const item of config.items) {
+      const prefix = nameFor(item), legacy = prefix + '_scoring-Comment';
+      if (answers[prefix + '_feedback'] === undefined && answers[legacy] !== undefined) answers[prefix + '_feedback'] = answers[legacy];
+      delete answers[legacy];
+    }
+    survey.data = answers; survey.currentPageNo = Math.max(0, Math.min(saved.page || 0, survey.pages.length - 1)); el('start').textContent = 'Lanjutkan penilaian';
+  }
   if (isSjt) { survey.setValue('signature', undefined); survey.setValue('signer_name', undefined); }
   const online = isSjt && !config.simulation && !config.previewPage;
   let receipt = null, sending = false, confirmed = false;
   function submissionAnswers() {
     const answers = {};
     for (const q of survey.getAllQuestions()) {
-      if (q.getType() === 'html') continue;
+      if (q.getType() === 'html' || (isSjt && q.name.endsWith('_feedback'))) continue;
       if (survey.data[q.name] !== undefined) answers[q.name] = survey.data[q.name];
       if (q.showCommentArea && survey.getComment(q.name)) answers[q.name + '-Comment'] = survey.getComment(q.name);
+    }
+    if (isSjt) for (const item of config.items) {
+      const prefix = nameFor(item), feedback = survey.getValue(prefix + '_feedback');
+      if (feedback) answers[prefix + '_scoring-Comment'] = feedback;
     }
     answers.years_service = Number(answers.years_service);
     return answers;
@@ -162,13 +175,13 @@
     const url = URL.createObjectURL(new Blob([text], { type: mime })); const a = document.createElement('a');
     a.href = url; a.download = config.slug + (draft ? '-draf-' : '-hasil-') + new Date().toISOString().slice(0, 10) + '.' + extension; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
-  function json(draft = false) { download(JSON.stringify({ schemaVersion: 1, instrument: config.slug, title: config.title, simulation: Boolean(config.simulation), completed: !draft && survey.isCompleted, receipt, exportedAt: new Date().toISOString(), page: survey.currentPageNo, answers: survey.data }, null, 2), 'json', 'application/json', draft); }
+  function json(draft = false) { download(JSON.stringify({ schemaVersion: 1, instrument: config.slug, title: config.title, simulation: Boolean(config.simulation), completed: !draft && survey.isCompleted, receipt, exportedAt: new Date().toISOString(), page: survey.currentPageNo, answers: isSjt ? submissionAnswers() : survey.data }, null, 2), 'json', 'application/json', draft); }
   function csv() {
     const identityKeys = original ? ['expert_name', 'position_unit', 'years_service', 'assessment_date', 'consent'] : ['expert_name','institution','position','expertise','years_service','assessment_date','consent'];
     const rows = [['instrument', ...identityKeys, 'item', 'dimension', 'source_text', 'options', ...criterionKeys, 'comment', 'recommendation', 'general_notes']];
     for (const item of config.items) {
       const prefix = nameFor(item);
-      rows.push([config.slug, ...identityKeys.map(k => survey.getValue(k) ?? ''), item.id, item.name, item.text, (item.options || []).join('\n'), ...criterionKeys.map(k => survey.getValue(prefix + '_' + k) ?? ''), survey.getComment(prefix + '_' + criterionKeys.at(-1)) || '', survey.getValue('recommendation') || '', survey.getValue('general_notes') || '']);
+      rows.push([config.slug, ...identityKeys.map(k => survey.getValue(k) ?? ''), item.id, item.name, item.text, (item.options || []).join('\n'), ...criterionKeys.map(k => survey.getValue(prefix + '_' + k) ?? ''), (isSjt ? survey.getValue(prefix + '_feedback') : survey.getComment(prefix + '_' + criterionKeys.at(-1))) || '', survey.getValue('recommendation') || '', survey.getValue('general_notes') || '']);
     }
     const cell = value => { let s = Array.isArray(value) ? value.join('; ') : String(value); if (/^[=+@\-\t\r]/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"'; };
     download('\uFEFF' + rows.map(row => row.map(cell).join(',')).join('\r\n'), 'csv', 'text/csv;charset=utf-8');
