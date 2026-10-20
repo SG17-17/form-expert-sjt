@@ -145,14 +145,14 @@
   function persist() {
     const record = { instrument: config.slug, answers: survey.data, page: survey.currentPageNo, updatedAt: new Date().toISOString() };
     try { localStorage.setItem(storageKey, JSON.stringify(record)); savingAvailable = true; } catch (_) { savingAvailable = false; }
-    el('status').textContent = savingAvailable ? (isSjt ? '' : 'Draf tersimpan di browser perangkat ini. Belum dikirim kepada peneliti.') : (isSjt ? 'Penyimpanan otomatis tidak tersedia. Selesaikan dan unduh hasil sebelum menutup halaman ini.' : 'Penyimpanan otomatis tidak tersedia. Unduh draf untuk menyimpan salinan jawaban.');
+    el('status').textContent = savingAvailable ? (isSjt ? '' : 'Draf tersimpan di browser perangkat ini. Belum dikirim kepada peneliti.') : (isSjt ? 'Penyimpanan otomatis tidak tersedia. Selesaikan pengisian dan kirim penilaian sebelum menutup halaman ini.' : 'Penyimpanan otomatis tidak tersedia. Unduh draf untuk menyimpan salinan jawaban.');
   }
   survey.onValueChanged.add(persist); survey.onCurrentPageChanged.add(persist);
   function showForm() {
     if (survey.isCompleted) survey.clear(false, true);
     el('intro').hidden = true; el('result').hidden = true; el('survey').hidden = false; el('tools').hidden = false;
     el('survey').replaceChildren(); const mount = document.createElement('div'); el('survey').append(mount); survey.render(mount);
-    el('status').textContent = savingAvailable ? (isSjt ? '' : 'Nilai bertanda * wajib diisi. Komentar bersifat opsional.') : (isSjt ? 'Penyimpanan otomatis tidak tersedia. Selesaikan dan unduh hasil sebelum menutup halaman ini.' : 'Penyimpanan otomatis tidak tersedia. Unduh draf sebelum menutup form.');
+    el('status').textContent = savingAvailable ? (isSjt ? '' : 'Nilai bertanda * wajib diisi. Komentar bersifat opsional.') : (isSjt ? 'Penyimpanan otomatis tidak tersedia. Selesaikan pengisian dan kirim penilaian sebelum menutup halaman ini.' : 'Penyimpanan otomatis tidak tersedia. Unduh draf sebelum menutup form.');
   }
   function showIntro() {
     persist(); el('intro').hidden = false; el('survey').hidden = true; el('result').hidden = true; el('tools').hidden = true; el('start').textContent = 'Lanjutkan penilaian';
@@ -164,7 +164,16 @@
     }
   }
   survey.onComplete.add(() => {
-    persist(); summary(); el('survey').hidden = true; el('intro').hidden = true; el('result').hidden = false; el('tools').hidden = true;
+    persist(); el('survey').hidden = true; el('intro').hidden = true; el('result').hidden = false; el('tools').hidden = true;
+    if (isSjt) {
+      el('result-title').textContent = config.simulation ? 'Simulasi selesai' : 'Terima kasih';
+      el('result-message').textContent = receipt
+        ? 'Penilaian Bapak/Ibu telah kami terima. Terima kasih atas waktu dan masukan yang diberikan.'
+        : 'Terima kasih atas waktu dan masukan Bapak/Ibu.';
+      el('status').textContent = '';
+      return;
+    }
+    summary();
     if (receipt) {
       el('result-title').textContent = 'Penilaian berhasil dikirim';
       el('result-message').textContent = 'Terima kasih. Penilaian Bapak/Ibu telah diterima oleh peneliti. Salinan hasil dapat diunduh di bawah ini.';
@@ -187,8 +196,10 @@
     download('\uFEFF' + rows.map(row => row.map(cell).join(',')).join('\r\n'), 'csv', 'text/csv;charset=utf-8');
   }
   el('start').addEventListener('click', showForm); el('guide').addEventListener('click', showIntro);
-  el('draft').addEventListener('click', () => { persist(); json(true); }); el('json').addEventListener('click', () => json()); el('csv').addEventListener('click', csv);
-  el('edit').addEventListener('click', () => { const data = { ...survey.data }; survey.clear(false, true); survey.data = data; survey.currentPageNo = survey.pages.length - 1; showForm(); });
+  if (!isSjt || config.simulation) {
+    el('draft')?.addEventListener('click', () => { persist(); json(true); }); el('json')?.addEventListener('click', () => json()); el('csv')?.addEventListener('click', csv);
+    el('edit')?.addEventListener('click', () => { const data = { ...survey.data }; survey.clear(false, true); survey.data = data; survey.currentPageNo = survey.pages.length - 1; showForm(); });
+  }
   if (config.previewPage === 'recommendation') {
     survey.currentPageNo = survey.pages.length - 1;
     showForm();
