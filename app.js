@@ -97,7 +97,7 @@
       ] },
       { type: 'comment', name: 'general_notes', title: 'Catatan umum dan rekomendasi perbaikan (opsional)', autoGrow: true }
     ] });
-    return { pages, title: '', showTitle: !isSjt, showQuestionNumbers: 'off', showProgressBar: 'top', progressBarType: 'pages', showPreviewBeforeComplete: isSjt ? 'noPreview' : 'showAnsweredQuestions', previewText: 'Tinjau seluruh penilaian', editText: 'Kembali mengisi', completeText: isSjt ? 'Kirim penilaian' : 'Selesaikan penilaian', pageNextText: 'Berikutnya', pagePrevText: 'Sebelumnya', widthMode: 'responsive', autoGrowComment: true, focusFirstQuestionAutomatic: false, requiredText: '*' };
+    return { pages, title: '', showTitle: !isSjt, textUpdateMode: 'onTyping', showQuestionNumbers: 'off', showProgressBar: 'top', progressBarType: 'pages', showPreviewBeforeComplete: isSjt ? 'noPreview' : 'showAnsweredQuestions', previewText: 'Tinjau seluruh penilaian', editText: 'Kembali mengisi', completeText: isSjt ? 'Kirim penilaian' : 'Selesaikan penilaian', pageNextText: 'Berikutnya', pagePrevText: 'Sebelumnya', widthMode: 'responsive', autoGrowComment: true, focusFirstQuestionAutomatic: false, requiredText: '*' };
   }
   const survey = new Survey.Model(makeSurvey());
   let savingAvailable = true, saved;
